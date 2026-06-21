@@ -110,3 +110,4 @@ jobs:
             - Write the diagnosis in Spanish.
             - The HTML marker `<!-- claude-triage -->` MUST be the very first line of the comment body so it can be found reliably.
             - Be specific and actionable — the diagnosis will be used to implement the fix later.
+            - The comment body MUST be valid GitHub Flavored Markdown (GFM): use `##`/`###` for headings, `-` for bullet lists, backticks for inline code, and fenced code blocks (` ``` `) for multi-line code. Do NOT use raw HTML tags (except for the `<!-- claude-triage -->` marker). Ensure the markdown renders correctly when posted as a GitHub issue comment.
