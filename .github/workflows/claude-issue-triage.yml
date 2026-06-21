@@ -1,0 +1,112 @@
+name: Claude Issue Triage
+
+on:
+  issues:
+    types: [opened, edited]
+
+jobs:
+  triage:
+    # Skip bots and opt-out marker to avoid noise/loops
+    if: |
+      github.event.issue.user.type != 'Bot' &&
+      !contains(github.event.issue.title, '[no-triage]') &&
+      !contains(github.event.issue.body, '[no-triage]')
+
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write    # apply labels + post comments
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Run Claude Issue Triage
+        uses: anthropics/claude-code-action@v1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: >-
+            --allowedTools
+            "Bash(gh issue view *),Bash(gh issue edit *),Bash(gh issue comment *),Bash(gh label list *),Bash(gh api *)"
+          prompt: |
+            You are an automated issue triage assistant for a Tetris game repository.
+
+            ## Repository context
+            This is a vanilla JS/HTML/CSS Tetris game with no dependencies or bundler.
+            Key files:
+            - `game.js` — All game logic (~300 lines). Board matrix, pieces, rotation, wall kicks, game loop, ghost piece, speed formula, scoring.
+            - `index.html` — DOM structure: board canvas (300×600 px), next-piece canvas (120×120 px), sidebar with score/lines/level, overlay for PAUSE/GAME OVER.
+            - `style.css` — Dark/retro aesthetic, overlay blur, `.hidden` = `display:none`.
+
+            ## Your task
+            Triage issue #${{ github.event.issue.number }} in repository ${{ github.repository }}.
+
+            Issue title: ${{ github.event.issue.title }}
+            Issue body:
+            ${{ github.event.issue.body }}
+
+            Event type: ${{ github.event.action }}
+
+            ### Step 1 — Gather available labels
+            Run: `gh label list --repo ${{ github.repository }}`
+            You MUST only use labels from that list. Do NOT create or invent new labels.
+
+            ### Step 2 — Determine appropriate labels
+            Analyze the issue and select which existing labels apply. Common mappings:
+            - Bug reports → `bug`
+            - New features/improvements → `enhancement`
+            - Docs/instructions → `documentation`
+            - Questions about behavior → `question`
+            - Duplicates → `duplicate`
+            - Out of scope / won't implement → `wontfix`
+            - Needs clarification / not actionable → `invalid`
+            - Good for new contributors → `good first issue`
+            - Needs community help → `help wanted`
+
+            Apply the chosen labels with:
+            `gh issue edit ${{ github.event.issue.number }} --repo ${{ github.repository }} --add-label "label1,label2"`
+
+            ### Step 3 — Check for existing triage comment (idempotency)
+            Run: `gh api repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments`
+            Look for a comment whose body contains the HTML marker `<!-- claude-triage -->`.
+
+            - If this is an `opened` event OR no prior triage comment exists → create a new comment.
+            - If this is an `edited` event AND a prior triage comment exists → edit that comment using:
+              `gh api --method PATCH repos/${{ github.repository }}/issues/comments/<COMMENT_ID> -f body='...'`
+              This avoids duplicate comments on repeated edits.
+
+            ### Step 4 — Post the diagnosis comment
+            Post (or update) a single structured comment with this exact format:
+
+            ```
+            <!-- claude-triage -->
+            ## 🔍 Diagnóstico automático del issue
+
+            ### Resumen
+            <One-paragraph summary of the reported problem.>
+
+            ### Causa probable
+            <Explain the likely root cause, referencing specific files and functions from this repo when relevant (e.g., `game.js` → `tryRotate()`, `loop()`, `rotateCW()`).>
+
+            ### Archivos probablemente afectados
+            <Bullet list of files and specific sections/functions likely involved.>
+
+            ### Enfoque de solución sugerido
+            <High-level numbered steps to implement a fix. Be concrete: mention which function to change, what logic to add/modify, etc.>
+
+            ### Labels asignados
+            <List the labels you applied and a one-line reason for each.>
+
+            ---
+            *Análisis generado automáticamente por Claude. Revisá antes de implementar.*
+            ```
+
+            Important:
+            - Write the diagnosis in Spanish.
+            - The HTML marker `<!-- claude-triage -->` MUST be the very first line of the comment body so it can be found reliably.
+            - Be specific and actionable — the diagnosis will be used to implement the fix later.
