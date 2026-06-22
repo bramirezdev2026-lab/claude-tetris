@@ -169,7 +169,8 @@ function drawBlock(context, x, y, colorIndex, size, alpha) {
 }
 
 function drawGrid() {
-  ctx.strokeStyle = '#22222e';
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  ctx.strokeStyle = isLight ? '#c8c8dc' : '#22222e';
   ctx.lineWidth = 0.5;
   for (let c = 1; c < COLS; c++) {
     ctx.beginPath();
@@ -300,5 +301,17 @@ document.addEventListener('keydown', e => {
 });
 
 restartBtn.addEventListener('click', init);
+
+// Theme toggle
+const themeToggle = document.getElementById('theme-toggle');
+const savedTheme = localStorage.getItem('tetris-theme') || 'dark';
+document.documentElement.setAttribute('data-theme', savedTheme);
+themeToggle.checked = savedTheme === 'light';
+
+themeToggle.addEventListener('change', () => {
+  const theme = themeToggle.checked ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('tetris-theme', theme);
+});
 
 init();
